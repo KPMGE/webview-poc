@@ -1,10 +1,7 @@
 package com.example.webviewpoc
 
 import android.annotation.SuppressLint
-import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.webkit.JavascriptInterface
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -13,32 +10,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.Modifier
 
-class WebAppInterface(
-    private val context: Context,
-    private val onPaymentSuccess: () -> Unit,
-    private val onPaymentFailure: () -> Unit
-) {
-    @JavascriptInterface
-    fun paymentSuccess() {
-        Handler(Looper.getMainLooper()).post {
-            onPaymentSuccess()
-        }
-    }
-
-    @JavascriptInterface
-    fun paymentFailure() {
-        Handler(Looper.getMainLooper()).post {
-            onPaymentFailure()
-        }
-    }
-}
-
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CheckoutWebViewCallback(
     paymentUrl: String,
     onPaymentSuccess: () -> Unit,
     onPaymentFailure: () -> Unit,
+    onLoadingFailure: () -> Unit = {},
+    onLoadingSuccess: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -47,10 +26,24 @@ fun CheckoutWebViewCallback(
         factory = { context ->
             WebView(context).apply {
                 addJavascriptInterface(
-                    WebAppInterface(context, onPaymentSuccess, onPaymentFailure),
+                    WebAppInterface(onPaymentSuccess, onPaymentFailure),
                     "Android"
                 )
                 webViewClient = object : WebViewClient() {
+                    override fun onReceivedError(
+                        view: WebView?,
+                        request: WebResourceRequest?,
+                        error: WebResourceError?
+                    ) {
+                        super.onReceivedError(view, request, error)
+                        onLoadingFailure()
+                    }
+
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        onLoadingSuccess()
+                    }
+
                     // This prevents redirects to external browsers
                     override fun shouldOverrideUrlLoading(
                         view: WebView?,
